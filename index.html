@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crash Algorithm Test Server</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-dark text-light p-4">
+    <div class="container bg-secondary bg-opacity-25 rounded p-4 shadow">
+        <h2 class="text-center text-warning mb-4">Aviator RNG Algorithm Simulator</h2>
+        
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">কতগুলো রাউন্ড জেনারেট করবেন?</label>
+                <input type="number" id="roundsInput" class="form-control bg-dark text-light" value="500">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">আপনার টার্গেট প্রেডিকশন ভ্যালু (যেমন: ২.০০x)</label>
+                <input type="number" step="0.1" id="targetInput" class="form-control bg-dark text-light" value="2.0">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button onclick="runTest()" class="btn btn-success w-100 fw-bold">সিমুলেশন রান করুন</button>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h4>স্ট্যাটিস্টিক্স ও একুরেসি</h4>
+                <div class="card bg-dark text-light p-3">
+                    <p>মোট উইন (টার্গেট বা তার বেশি): <span id="winCount" class="text-success fw-bold">-</span></p>
+                    <p>মোট লস (টার্গেটের নিচে ক্র্যাশ): <span id="lossCount" class="text-danger fw-bold">-</span></p>
+                    <p>আপনার স্ট্র্যাটেজির আসল একুরেসি: <span id="accuracyPercent" class="text-warning fw-bold">-</span></p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <canvas id="resultChart" style="max-height: 200px;"></canvas>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>লাইভ জেনারেটেড ডেটা লগ (সর্বশেষ ৫০টি রাউন্ড)</h4>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-dark table-striped text-center">
+                    <thead>
+                        <tr>
+                            <th>রাউন্ড নং</th>
+                            <th>ক্র্যাশ পয়েন্ট</th>
+                            <th>আপনার প্রেডিকশন রেজাল্ট</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let myChart;
+        function runTest() {
+            const rounds = document.getElementById('roundsInput').value;
+            const target = document.getElementById('targetInput').value;
+
+            fetch('/api/generate_rounds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rounds: rounds, target: target })
+            })
+            .then(res => res.json())
+            .then(resData => {
+                document.getElementById('winCount').innerText = resData.total_wins;
+                document.getElementById('lossCount').innerText = resData.total_losses;
+                document.getElementById('accuracyPercent').innerText = resData.accuracy + "%";
+
+                const tbody = document.getElementById('dataTableBody');
+                tbody.innerHTML = "";
+                resData.data.slice(-50).reverse().forEach(item => {
+                    tbody.innerHTML += `<tr>
+                        <td>${item.round}</td>
+                        <td class="${item.crash_point >= 2 ? 'text-info' : 'text-danger'}">${item.crash_point}x</td>
+                        <td><span class="badge ${item.result === 'Win' ? 'bg-success' : 'bg-danger'}">${item.result}</span></td>
+                    </tr>`;
+                });
+
+                if (myChart) myChart.destroy();
+                const ctx = document.getElementById('resultChart').getContext('2d');
+                myChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Win', 'Loss'],
+                        datasets: [{
+                            data: [resData.total_wins, resData.total_losses],
+                            backgroundColor: ['#198754', '#dc3545']
+                        }]
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>
